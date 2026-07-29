@@ -305,7 +305,7 @@ class Knowledge(ComponentBase):
         """
         return LangchainTool(
             name=self.name,
-            description=self.description or '' + args_description,
+            description=(self.description or '') + args_description,
             func=self.langchain_query,
         )
 
@@ -326,7 +326,7 @@ class Knowledge(ComponentBase):
         """
         return LangchainTool(
             name=self.name,
-            description=self.description or '' + args_description,
+            description=(self.description or '') + args_description,
             func=self.async_langchain_query,
         )
 
