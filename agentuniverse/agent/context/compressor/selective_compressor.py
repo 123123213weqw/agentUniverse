@@ -434,6 +434,7 @@ class SelectiveCompressor(ContextCompressor):
             Sorted list (highest score first)
         """
         def calculate_score(seg: ContextSegment) -> float:
+            """Calculate score."""
             # Relevance: decay score
             relevance_score = seg.calculate_decay()
 
