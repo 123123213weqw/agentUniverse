@@ -86,6 +86,7 @@ class LLMChannel(ComponentBase):
         return self
 
     def create_copy(self):
+        """Create copy."""
         return self
 
     @property
