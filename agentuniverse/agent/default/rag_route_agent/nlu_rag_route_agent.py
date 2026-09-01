@@ -48,6 +48,7 @@ class NluRagRouteAgent(RagAgentTemplate):
         return agent_result
 
     def process_llm(self, **kwargs) -> LLM:
+        """Process llm."""
         llm_name = self.agent_model.profile.get('llm_model', {}).get('name') or self.llm_name
         return LLMManager().get_instance_obj(llm_name)
 
