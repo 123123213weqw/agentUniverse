@@ -73,6 +73,7 @@ class DoubaoEmbedding(Embedding):
 
     async def async_get_embeddings(self, texts: List[str],
                                    **kwargs) -> List[List[float]]:
+        """Async Get Embeddings."""
         return self.get_embeddings(texts)
 
     def _initialize_by_component_configer(
