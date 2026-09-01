@@ -33,6 +33,7 @@ class PeerAgentTemplate(AgentTemplate):
     expert_framework: Optional[dict[str, Union[str, dict]]] = None
 
     def input_keys(self) -> list[str]:
+        """Input Keys."""
         return ['input']
 
     def output_keys(self) -> list[str]:
