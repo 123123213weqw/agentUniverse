@@ -18,6 +18,7 @@ class GeminiOfficialLLMChannel(LLMChannel):
     channel_api_base: Optional[str] = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
     def max_context_length(self) -> int:
+        """Max Context Length."""
         if super().max_context_length():
             return super().max_context_length()
         return GEMINI_MAX_CONTEXT_LENGTH.get(self.channel_model_name, 8000)
