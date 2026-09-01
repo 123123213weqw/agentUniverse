@@ -36,6 +36,7 @@ class CharacterTextSplitter(DocProcessor):
 
     @property
     def splitter(self) -> Splitter:
+        """Splitter."""
         if not self.__splitter:
             self.__splitter = Splitter(separator=self.separator,
                                  chunk_size=self.chunk_size,
