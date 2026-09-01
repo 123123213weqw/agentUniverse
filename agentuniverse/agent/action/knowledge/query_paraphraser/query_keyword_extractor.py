@@ -22,6 +22,7 @@ class QueryKeywordExtractor(QueryParaphraser):
 
     def query_paraphrase(self, origin_query: Query) -> Query:
 
+        """Query Paraphrase."""
         keyword_extractor_instance = DocProcessorManager().get_instance_obj(self.keyword_extractor)
 
         keywords = keyword_extractor_instance.process_docs(
