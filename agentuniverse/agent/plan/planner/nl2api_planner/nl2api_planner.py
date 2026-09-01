@@ -55,6 +55,7 @@ class Nl2ApiPlanner(Planner):
 
     @staticmethod
     def acquire_tools(action) -> list[LangchainTool]:
+        """Acquire Tools."""
         tool_names: list = action.get('tool') or list()
         lc_tools: list[LangchainTool] = list()
         for tool_name in tool_names:
