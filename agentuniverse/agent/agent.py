@@ -98,6 +98,7 @@ class Agent(ComponentBase, ABC):
         pass
 
     def update_trace_context(self, input_object: InputObject):
+        """Update trace context."""
         session_id = input_object.get_data("session_id")
         if session_id:
             AuTraceManager().trace_context.set_session_id(session_id)
