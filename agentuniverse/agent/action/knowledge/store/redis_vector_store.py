@@ -337,6 +337,7 @@ class RedisVectorStore(Store):
         return documents
 
     def query(self, query: Query, **kwargs: Any) -> list[Document]:
+        """Query."""
         vector = self._embedding_for_query(query)
         top_k = self._top_k(query)
         self._ensure_index(len(vector))
