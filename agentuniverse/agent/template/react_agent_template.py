@@ -40,6 +40,7 @@ class ReActAgentTemplate(AgentTemplate):
     max_iterations: Optional[int] = None
 
     def input_keys(self) -> list[str]:
+        """Input Keys."""
         return ['input']
 
     def output_keys(self) -> list[str]:
