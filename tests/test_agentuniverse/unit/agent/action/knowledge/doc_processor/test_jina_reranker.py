@@ -7,6 +7,7 @@
 # @FileName: test_jina_reranker.py
 
 import unittest
+import requests
 from unittest.mock import patch, MagicMock
 
 from agentuniverse.agent.action.knowledge.doc_processor.jina_reranker import JinaReranker
@@ -17,8 +18,10 @@ from agentuniverse.base.config.configer import Configer
 
 
 class TestJinaReranker(unittest.TestCase):
+    """Tests for the JinaReranker doc processor and its configuration."""
 
     def setUp(self):
+        """Build a configured reranker plus sample docs/query for the tests."""
         cfg = Configer()
         cfg.value = {
             'name': 'jina_reranker',
@@ -42,6 +45,7 @@ class TestJinaReranker(unittest.TestCase):
         self.test_query = Query(query_str='test query')
 
     def test_initialize_by_component_configer_with_env(self):
+        """Config values initialize api_key/model_name/top_n attributes."""
         with patch('agentuniverse.base.util.env_util.get_from_env') as mock_get_env:
             mock_get_env.return_value = 'test_api_key'
             self.reranker = JinaReranker()
@@ -53,6 +57,7 @@ class TestJinaReranker(unittest.TestCase):
 
     @patch('requests.post')
     def test_process_docs(self, mock_post):
+        """_process_docs reranks and reorders docs per API relevance scores."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
             'results': [
@@ -80,7 +85,8 @@ class TestJinaReranker(unittest.TestCase):
                 'query': 'test query',
                 'documents': [doc.text for doc in self.test_docs],
                 'top_n': 10
-            }
+            },
+            timeout=30
         )
 
         self.assertEqual(len(result_docs), 5)
@@ -91,6 +97,7 @@ class TestJinaReranker(unittest.TestCase):
 
     @patch('requests.post')
     def test_process_docs_with_top_n(self, mock_post):
+        """top_n limits how many reranked results are returned."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
             'results': [
@@ -116,21 +123,114 @@ class TestJinaReranker(unittest.TestCase):
                 'query': 'test query',
                 'documents': [doc.text for doc in self.test_docs],
                 'top_n': 2
-            }
+            },
+            timeout=30
         )
 
         self.assertEqual(len(result_docs), 2)
 
     def test_process_docs_no_api_key(self):
+        """Processing without an api key raises a descriptive exception."""
         with self.assertRaises(Exception) as context:
             self.reranker._process_docs(self.test_docs, self.test_query)
 
         self.assertTrue('Jina AI API key is not set' in str(context.exception))
 
     def test_process_docs_no_docs(self):
+        """Processing an empty doc list returns an empty result."""
         self.reranker.api_key = 'test_api_key'
         result_docs = self.reranker._process_docs([], self.test_query)
         self.assertEqual(len(result_docs), 0)
+
+    @patch('requests.post')
+    def test_process_docs_passes_default_timeout(self, mock_post):
+        """The default request timeout (30s) is passed to the API call."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {'results': []}
+        mock_post.return_value = mock_response
+        self.reranker.api_key = 'test_api_key'
+        self.reranker._process_docs(self.test_docs, self.test_query)
+        _, kwargs = mock_post.call_args
+        self.assertEqual(kwargs.get('timeout'), 30)
+
+    @patch('requests.post')
+    def test_process_docs_passes_custom_request_timeout(self, mock_post):
+        """A configured request_timeout is passed to the API call."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {'results': []}
+        mock_post.return_value = mock_response
+        self.reranker.api_key = 'test_api_key'
+        self.reranker.request_timeout = 5
+        self.reranker._process_docs(self.test_docs, self.test_query)
+        _, kwargs = mock_post.call_args
+        self.assertEqual(kwargs.get('timeout'), 5)
+
+    @patch('requests.post')
+    def test_process_docs_timeout_error_is_surfaced(self, mock_post):
+        """A requests Timeout is surfaced as a descriptive API-call error."""
+        mock_post.side_effect = requests.exceptions.Timeout('timed out')
+        self.reranker.api_key = 'test_api_key'
+        with self.assertRaises(Exception) as context:
+            self.reranker._process_docs(self.test_docs, self.test_query)
+        self.assertIn('Jina AI rerank API call error', str(context.exception))
+
+    @patch('requests.post')
+    def test_process_docs_non_json_response_is_surfaced(self, mock_post):
+        """A non-JSON response body is reported distinctly from API errors."""
+        # Use a real Response whose .json() raises
+        # requests.exceptions.JSONDecodeError — the actual exception a non-JSON
+        # body produces. JSONDecodeError inherits from BOTH RequestException
+        # and ValueError, so a naive except-ordering would misreport it as an
+        # API-call error; this test pins the non-JSON path.
+        mock_response = requests.Response()
+        mock_response.status_code = 200
+        mock_response._content = b'<html>upstream error page</html>'
+        mock_post.return_value = mock_response
+        self.reranker.api_key = 'test_api_key'
+        with self.assertRaises(Exception) as context:
+            self.reranker._process_docs(self.test_docs, self.test_query)
+        self.assertIn('non-JSON', str(context.exception))
+        self.assertNotIn('API call error', str(context.exception))
+
+    def _make_configer_with_timeout(self, request_timeout):
+        """Build a ComponentConfiger carrying the given request_timeout."""
+        cfg = Configer()
+        cfg.value = {
+            'name': 'jina_reranker',
+            'description': 'reranker use jina api',
+            'request_timeout': request_timeout,
+        }
+        configer = ComponentConfiger()
+        configer.load_by_configer(cfg)
+        return configer
+
+    def test_initialize_rejects_non_numeric_request_timeout(self):
+        """Non-numeric request_timeout values are rejected at init."""
+        for bad in ('not-a-number', None, [30]):
+            reranker = JinaReranker()
+            with self.assertRaises(Exception) as context:
+                reranker._initialize_by_component_configer(
+                    self._make_configer_with_timeout(bad))
+            self.assertIn('request_timeout', str(context.exception))
+
+    def test_initialize_rejects_non_positive_request_timeout(self):
+        """Zero, negative and boolean request_timeout values are rejected."""
+        # 0 / negative are invalid; True/False are bools (an int subclass) and
+        # must also be rejected so a YAML `true` does not silently become 1.
+        for bad in (0, -5, True, False):
+            reranker = JinaReranker()
+            with self.assertRaises(Exception) as context:
+                reranker._initialize_by_component_configer(
+                    self._make_configer_with_timeout(bad))
+            self.assertIn('request_timeout', str(context.exception))
+
+    def test_initialize_accepts_valid_request_timeout(self):
+        """Positive numeric request_timeout values initialize successfully."""
+        for good in (1, 30, 5.5):
+            reranker = JinaReranker()
+            reranker._initialize_by_component_configer(
+                self._make_configer_with_timeout(good))
+            self.assertEqual(reranker.request_timeout, good)
 
 if __name__ == '__main__':
     unittest.main()

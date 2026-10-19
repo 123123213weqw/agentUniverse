@@ -6,18 +6,44 @@
 # @Email   : zhangdongxu0852@163.com
 # @FileName: readimage_tool.py
 
-import cv2
-import pytesseract
-from PIL import Image
-import numpy as np
 import re
 import os
+
+try:
+    import cv2
+except ImportError:
+    cv2 = None
+
+try:
+    import pytesseract
+except ImportError:
+    pytesseract = None
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
+
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
+
+def _require_dependency(dependency, package_name: str):
+    if dependency is None:
+        raise ImportError(
+            f"{package_name} is required for readimage_tool. "
+            f"Install it before using image OCR features."
+        )
+
 
 def enhance_image(image):
     """
     Enhance the image: convert to grayscale, apply CLAHE for contrast enhancement,
     then apply bilateral filtering to reduce noise while preserving edges.
     """
+    _require_dependency(cv2, "opencv-python")
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     enhanced = clahe.apply(gray)
@@ -30,6 +56,19 @@ def detect_text_regions(image, east_model='frozen_east_text_detection.pb', min_c
     Detect text regions in the image using the EAST text detection model.
     Returns a list of image regions (as numpy arrays) corresponding to text areas.
     """
+    _require_dependency(cv2, "opencv-python")
+    _require_dependency(np, "numpy")
+    if (
+        isinstance(width, bool)
+        or isinstance(height, bool)
+        or not isinstance(width, int)
+        or not isinstance(height, int)
+        or width <= 0
+        or height <= 0
+        or width % 32 != 0
+        or height % 32 != 0
+    ):
+        raise ValueError("width and height must be positive multiples of 32")
     # Load the EAST model
     net = cv2.dnn.readNet(east_model)
     orig = image.copy()
@@ -102,6 +141,8 @@ def ocr_on_regions(regions, lang='chi_sim+eng'):
     """
     Perform OCR on each text region separately and concatenate the results.
     """
+    _require_dependency(Image, "Pillow")
+    _require_dependency(pytesseract, "pytesseract")
     texts = []
     config = "--oem 3 --psm 6"
     for region in regions:
@@ -132,11 +173,14 @@ def extract_text_from_image(image_path, use_east=True, lang='chi_sim+eng'):
       - If use_east is True, use the EAST model to detect text regions and perform OCR on each region.
       - Otherwise, perform OCR on the enhanced whole image.
     """
+    _require_dependency(cv2, "opencv-python")
+    _require_dependency(Image, "Pillow")
+    _require_dependency(pytesseract, "pytesseract")
     # Read image using IMREAD_UNCHANGED to support any image format
     image = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
     if image is None:
         raise ValueError("Cannot load image, please check the path")
-    
+
     # Convert image to 3-channel BGR if it's not already
     if len(image.shape) == 2:
         # If the image is grayscale, convert to BGR
@@ -144,10 +188,10 @@ def extract_text_from_image(image_path, use_east=True, lang='chi_sim+eng'):
     elif len(image.shape) == 3 and image.shape[2] == 4:
         # If the image has an alpha channel, convert BGRA to BGR
         image = cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
-    
+
     # Enhance the image
     enhanced = enhance_image(image)
-    
+
     if use_east:
         try:
             # Use the original color image for EAST detection (usually yields better results)
@@ -164,7 +208,7 @@ def extract_text_from_image(image_path, use_east=True, lang='chi_sim+eng'):
         pil_img = Image.fromarray(enhanced)
         config = "--oem 3 --psm 6"
         raw_text = pytesseract.image_to_string(pil_img, lang=lang, config=config)
-    
+
     final_text = clean_extracted_text(raw_text)
     return final_text
 

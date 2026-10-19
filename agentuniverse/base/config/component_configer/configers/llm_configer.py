@@ -2,7 +2,7 @@
 # -*- coding:utf-8 -*-
 
 # @Time    : 2024/3/13 12:01
-# @Author  : jerry.zzw 
+# @Author  : jerry.zzw
 # @Email   : jerry.zzw@antgroup.com
 # @FileName: llm_configer.py
 from typing import Optional
@@ -80,7 +80,7 @@ class LLMConfiger(ComponentConfiger):
         Returns:
             LLMConfiger: the LLMConfiger object
         """
-        return self.load_by_configer(self.__configer)
+        return self.load_by_configer(self.configer)
 
     def load_by_configer(self, configer: Configer) -> 'LLMConfiger':
         """Load the configuration by the Configer object.
